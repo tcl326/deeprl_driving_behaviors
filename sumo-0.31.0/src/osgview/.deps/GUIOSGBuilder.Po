@@ -1,3 +1,0 @@
-GUIOSGBuilder.o: GUIOSGBuilder.cpp ../../src/config.h
-
-../../src/config.h:

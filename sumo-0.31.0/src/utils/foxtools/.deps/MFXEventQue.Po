@@ -1,3 +1,0 @@
-MFXEventQue.o: MFXEventQue.cpp ../../../src/config.h
-
-../../../src/config.h:
