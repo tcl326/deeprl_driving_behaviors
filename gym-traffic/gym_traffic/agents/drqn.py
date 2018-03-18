@@ -104,8 +104,8 @@ class DRQN():
         #and then returned to [batch x units] when sent through the upper levles.
 
         self.batch_size = tf.placeholder(dtype = tf.int32, shape = [])
-
-
+        flatten = tf.contrib.layers.flatten(self.conv4)
+        
         self.convFlat = tf.reshape(slim.flatten(self.conv4), [self.batch_size, self.trainLength, self.h_size])
 
         self.state_in = self.rnn_cell.zero_state(self.batch_size, tf.float32)
@@ -116,7 +116,8 @@ class DRQN():
         self.rnn = tf.reshape(self.rnn,shape=[-1, self.h_size])
 
         #The output from the recurrent player is then split into separate Value and Advantage streams
-        self.streamA, self.streamV = tf.split(self.rnn, 2, 1)
+        
+        self.streamA, self.streamV = tf.split(flatten, 2, 1)
         # self.AW = tf.Variable(tf.random_normal([self.h_size//2, 4]))
         self.AW = tf.Variable(tf.random_normal([self.h_size//2, 3]))
         self.VW = tf.Variable(tf.random_normal([self.h_size//2, 1]))
