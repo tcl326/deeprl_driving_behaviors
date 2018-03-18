@@ -181,7 +181,7 @@ class DRQNRunner(object):
             break
 
         print ('steps taken: ', j)
-
+        print ('total reward: ', rAll)
         #Add the episode to the experience buffer
         if (len(episodeBuffer)>= self.trace_length):
           bufferArray = np.array(episodeBuffer)
