@@ -8,7 +8,7 @@ from gym import spaces
 import itertools
 # from keras import backend as K
 import os
-from agent import Agent
+from .agent import Agent
 from random import shuffle
 import tensorflow as tf
 import tensorflow.contrib.slim as slim

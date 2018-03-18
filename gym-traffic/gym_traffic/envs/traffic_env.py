@@ -242,7 +242,7 @@ class TrafficEnv(Env):
                         min_ttc = new_ttc
 
         else:
-            print 'Invalid route for ego-vehicle. No action will be taken.'
+            print('Invalid route for ego-vehicle. No action will be taken.')
 
         # decision making based on min time-to-collision
         if (front_warning and min_ttc < 3.0) or pre_collision:
@@ -296,8 +296,8 @@ class TrafficEnv(Env):
                or self.ego_veh.reached_goal(traci.vehicle.getPosition(self.ego_veh.vehID)) \
                or (self.sumo_step > self.simulation_end) \
                # or (self.ego_veh.vehID not in traci.vehicle.getIDList()) \
-        self.screenshot()
-        self._render()
+        #self.screenshot()
+        #self._render()
         # if done:
         #     print "Collision?  ", self.ego_veh_collision
         #     print "Steps = ", self.sumo_step, "      |    braking steps = ", self.braking_time
