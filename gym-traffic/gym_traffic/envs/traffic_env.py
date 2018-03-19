@@ -303,7 +303,8 @@ class TrafficEnv(Env):
         # if done:
         #     print "Collision?  ", self.ego_veh_collision
         #     print "Steps = ", self.sumo_step, "      |    braking steps = ", self.braking_time
-
+        plt.imshow(observation[:,:,1])
+        plt.show(block=False)
         return observation, reward, done, self.route_info
 
     def screenshot(self):

@@ -15,6 +15,8 @@ import math
 import random
 import time
 
+from skimage.draw import polygon
+
 if 'SUMO_HOME' in os.environ:
     tools = os.path.join(os.environ['SUMO_HOME'], 'tools')
     sys.path.append(tools)
@@ -321,9 +323,11 @@ class TrafficEnvMultiAgents(Env):
 
         self.remove_collided_cars()
 
+        if self.sumo_step%5 == 0:
         # plt.imshow(observation_list[0][:,:,0])ex
-        # plt.imshow(observation_list[0][:,:,1])
-        # plt.show(block=False)
+            plt.imshow(observation_list[3][:,:,1])
+            plt.colorbar()
+            plt.show()
 
         return np.array(observation_list), np.array(reward_list), np.array(done_list), self.route_info
 
@@ -332,6 +336,8 @@ class TrafficEnvMultiAgents(Env):
             if self.ego_veh_collision_dict[orientation] and not self.ego_veh_removed_dict[orientation]:
                 self.ego_veh_removed_dict[orientation] = True
                 ego_veh = self.ego_vehicles_dict[orientation]
+                if ego_veh.vehID not in traci.vehicle.getIDList():
+                    continue
                 traci.vehicle.remove(vehID=ego_veh.vehID, reason=3)
 
     def screenshot(self):
@@ -350,8 +356,8 @@ class TrafficEnvMultiAgents(Env):
 
         if ego_veh.vehID in traci.vehicle.getIDList():
             ego_car_pos = traci.vehicle.getPosition(ego_veh.vehID)
-            print(orientation, ego_car_pos)
             ego_car_ang = traci.vehicle.getAngle(ego_veh.vehID)
+            print(orientation, ego_car_pos, ego_car_ang)
             ego_car_in_scene = True
 
         for i in traci.vehicle.getIDList():
@@ -365,101 +371,12 @@ class TrafficEnvMultiAgents(Env):
                 if(np.linalg.norm(np.asarray(pos)-np.asarray(ego_car_pos))<42) and i not in ego_veh.vehID: #42 is 42 meters
                     visible.append(state_tuple)
         print(visible)
-
-        def location2bounds(x, y, angle):
+        if not ego_car_in_scene:
             bound = 84
-            car_length = 5 # meters
-            car_width = 1.8 # meters
-            # continuous bounds
-            car_c_bound_x_1 = 0
-            car_c_bound_x_2 = 0
-            car_c_bound_y_1 = 0
-            car_c_bound_y_2 = 0
-            # if orientation == 'vertical':
-            #     car_c_bound_x_1 = x-(car_width/2.0)
-            #     car_c_bound_x_2 = x+(car_width/2.0)
-            #     car_c_bound_y_1 = y-(car_length/2.0)
-            #     car_c_bound_y_2 = y+(car_length/2.0)
-            # elif orientation == 'horizontal':
-            #     car_c_bound_x_1 = x-(car_length/2.0)
-            #     car_c_bound_x_2 = x+(car_length/2.0)
-            #     car_c_bound_y_1 = y-(car_width/2.0)
-            #     car_c_bound_y_2 = y+(car_width/2.0)
-            if (abs(angle - 0.0) < 0.01):
-                car_c_bound_x_1 = x-(car_width/2.0)
-                car_c_bound_x_2 = x+(car_width/2.0)
-                car_c_bound_y_1 = y-car_length
-                car_c_bound_y_2 = y
-            elif (abs(angle - 180.0) < 0.01):
-                car_c_bound_x_1 = x-(car_width/2.0)
-                car_c_bound_x_2 = x+(car_width/2.0)
-                car_c_bound_y_1 = y
-                car_c_bound_y_2 = y+car_length
-            elif (abs(angle - 90.0) < 0.01):
-                car_c_bound_x_1 = x-car_length
-                car_c_bound_x_2 = x
-                car_c_bound_y_1 = y-(car_width/2.0)
-                car_c_bound_y_2 = y+(car_width/2.0)
-            elif (abs(angle - 270.0) < 0.01):
-                car_c_bound_x_1 = x
-                car_c_bound_x_2 = x+car_length
-                car_c_bound_y_1 = y-(car_width/2.0)
-                car_c_bound_y_2 = y+(car_width/2.0)
-
-
-            # discrete bounds
-            car_d_bound_x_1 = np.floor(car_c_bound_x_1)+np.floor(bound/2.0)
-            car_d_bound_x_2 = np.floor(car_c_bound_x_2)+np.floor(bound/2.0)
-            car_d_bound_y_1 = np.floor(car_c_bound_y_1)+np.floor(bound/2.0)
-            car_d_bound_y_2 = np.floor(car_c_bound_y_2)+np.floor(bound/2.0)
-
-            if (car_d_bound_x_1 < 0):
-                car_d_bound_x_1 = 0
-            if (car_d_bound_x_2 < 0):
-                car_d_bound_x_2 = 0
-            if (car_d_bound_y_1 < 0):
-                car_d_bound_y_1 = 0
-            if (car_d_bound_y_2 < 0):
-                car_d_bound_y_2 = 0
-            if (car_d_bound_x_1 >= bound):
-                car_d_bound_x_1 = bound-1
-            if (car_d_bound_x_2 >= bound):
-                car_d_bound_x_2 = bound-1
-            if (car_d_bound_y_1 >= bound):
-                car_d_bound_y_1 = bound-1
-            if (car_d_bound_y_2 >= bound):
-                car_d_bound_y_2 = bound-1
-
-            return (car_d_bound_x_1, car_d_bound_x_2, car_d_bound_y_1, car_d_bound_y_2)
-
-
-        bound = 84
-        obstacle_image = np.zeros((bound,bound,2)) # 1 meter descretization image
-        if ego_car_in_scene:
-            # insert ego car
-            car_bounds = location2bounds(0.0, 0.0, 0.0)
-            for x in range(int(car_bounds[0]), int(car_bounds[1]+1)):
-                for y in range(int(car_bounds[2]), int(car_bounds[3]+1)):
-                    obstacle_image[bound-1-y,x,0] = 1
-
-            #other cars
-            for other_car in visible:
-                #if vertical
-                # if (other_car[5] == 'route_ns') or (other_car[5] == 'route_sn'):
-                if (abs(other_car[3] - 0.0) < 0.01) or (abs(other_car[3] - 180.0) < 0.01):
-                    car_bounds = location2bounds(other_car[1]-ego_car_pos[0], other_car[2]-ego_car_pos[1], other_car[3])
-                    for x in range(int(car_bounds[0]), int(car_bounds[1]+1)):
-                        for y in range(int(car_bounds[2]), int(car_bounds[3]+1)):
-                            obstacle_image[bound-1-y,x,1] = 1
-                #if horizontal
-                # if (other_car[5] == 'route_ew') or (other_car[5] == 'route_we'):
-                if (abs(other_car[3] - 90.0) < 0.01) or (abs(other_car[3] - 270.0) < 0.01):
-                    car_bounds = location2bounds(other_car[1]-ego_car_pos[0], other_car[2]-ego_car_pos[1], other_car[3])
-                    for x in range(int(car_bounds[0]), int(car_bounds[1]+1)):
-                        for y in range(int(car_bounds[2]), int(car_bounds[3]+1)):
-                            obstacle_image[bound-1-y,x,1] = 1
-
-            obstacle_image[:,:,1] = (np.clip(rotate(obstacle_image[:,:,1], ego_car_ang, reshape=False, output=np.float), 0, 1))
+            obstacle_image = np.zeros((bound,bound,2))
+        else:
+            # print('Rendering')
+            obstacle_image = self.render_scene(visible, ego_car_pos, ego_car_ang)
 
             # plt.imsave('test.jpg', obstacle_image)
             # plt.ion()
@@ -476,9 +393,81 @@ class TrafficEnvMultiAgents(Env):
             # plt.show(block=False)
             # plt.show()
 
-        # index = self.orientation_orders.index(orientation)
-        # obstacle_image = np.rot90(obstacle_image, k=index)
+        index = self.orientation_orders.index(orientation)
+        obstacle_image = np.rot90(obstacle_image, k=index)
         return obstacle_image
+
+    def render_scene(self, visible, ego_car_pos, ego_car_ang):
+
+        def get_car_shape(car_length, car_width):
+            r = [-1, -1, car_length/unit_dist, car_length/unit_dist]
+            c = [-1, car_width/unit_dist, car_width/unit_dist,-1]
+            rr, cc = polygon(r, c)
+            return rr-car_length/1.2/unit_dist, cc-car_width/2.0/unit_dist
+
+        def get_car_coords(x, y, angle, car_template_y, car_template_x):
+            theta = np.radians(angle)
+            c, s = np.cos(theta), np.sin(theta)
+            transform = np.array([[c, -s, 0],[s, c, 0],[x, y, 1]])
+            car_homogenous = np.ones((car_template_y.shape[0], 3))
+            car_homogenous[:,0] = car_template_x
+            car_homogenous[:,1] = car_template_y
+            return np.dot(car_homogenous, transform)
+
+        def draw_scene(X, Y, angles, car_template_y, car_template_x, bound, ids):
+            cars = []
+            for i, angle in enumerate(angles):
+                car = get_car_coords(X[i], Y[i], angle, car_template_y, car_template_x)
+                cars.append(car)
+            scene = np.zeros((int(bound/unit_dist),int(bound/unit_dist),2))
+            for id, car in zip(ids, cars):
+                car_x = car[:,0]
+                car_y = car[:,1]
+                car_x = np.clip(car_x, 0, int(bound/unit_dist)-1)
+                car_y = np.clip(car_y, 0, int(bound/unit_dist)-1)
+                # print id
+                val = 1
+                # if id[-1] == 'e':
+                #     val = 1
+                # elif id[-1] == 'n':
+                #     val = 2
+                # elif id[-1] == 'w':
+                #     val = 3
+                # elif id[-1] == 's':
+                #     val = 4
+                scene[np.rint(car_y).astype(int), np.rint(car_x).astype(int), 1] = val
+
+            ego_car_coord = get_car_coords(bound/2.0/unit_dist, bound/2.0/unit_dist, 0, car_template_y, car_template_x)
+            car_x = ego_car_coord[:,0]
+            car_y = ego_car_coord[:,1]
+            scene[np.rint(car_y).astype(int), np.rint(car_x).astype(int), 0] = 1
+            return scene
+
+        def transform_visible(visible, ego_car_pos, ego_car_ang, bound):
+            X, Y, angles, ids = [], [], [], []
+            ego_x, ego_y = ego_car_pos[0], ego_car_pos[1]
+            for car_id,pos_x, pos_y, angle, speed, laneid in visible:
+                X.append((pos_x - ego_x)/unit_dist + bound/2.0/unit_dist)
+                Y.append((pos_y - ego_y)/unit_dist + bound/2.0/unit_dist)
+                ids.append(car_id)
+                angles.append(angle)
+
+            return np.array(X), np.array(Y), np.array(angles), ids
+
+        car_length = 4.3
+        car_width = 1.8
+        unit_dist = .1
+        bound = 42
+        car_template_y, car_template_x = get_car_shape(car_length, car_width)
+
+        X, Y, angles, ids = transform_visible(visible, ego_car_pos, ego_car_ang, bound)
+
+        # X = np.clip(X, 0, int(bound/unit_dist)-1)
+        # Y = np.clip(Y, 0, int(bound/unit_dist)-1)
+
+        obstacle_image = draw_scene(X, Y, angles, car_template_y, car_template_x, bound, ids)
+
+        return np.flipud(obstacle_image)
 
     def _reset(self):
         # if self.sumo_running:
