@@ -325,7 +325,7 @@ class TrafficEnvMultiAgents(Env):
 
         # if self.sumo_step%5 == 0:
         # # plt.imshow(observation_list[0][:,:,0])ex
-        #     plt.imshow(observation_list[3][:,:,1])
+        #     plt.imshow(observation_list[2][:,:,1])
         #     plt.colorbar()
         #     plt.show()
 
@@ -376,7 +376,7 @@ class TrafficEnvMultiAgents(Env):
             obstacle_image = np.zeros((bound,bound,2))
         else:
             # print('Rendering')
-            obstacle_image = self.render_scene(visible, ego_car_pos, ego_car_ang)
+            obstacle_image = self.render_scene(visible, ego_car_pos, ego_car_ang, orientation)
 
             # plt.imsave('test.jpg', obstacle_image)
             # plt.ion()
@@ -397,7 +397,7 @@ class TrafficEnvMultiAgents(Env):
         obstacle_image = np.rot90(obstacle_image, k=index)
         return obstacle_image
 
-    def render_scene(self, visible, ego_car_pos, ego_car_ang):
+    def render_scene(self, visible, ego_car_pos, ego_car_ang, orientation):
 
         def get_car_shape(car_length, car_width):
             r = [-1, -1, car_length/unit_dist, car_length/unit_dist]
@@ -450,7 +450,8 @@ class TrafficEnvMultiAgents(Env):
                 X.append((pos_x - ego_x)/unit_dist + bound/2.0/unit_dist)
                 Y.append((pos_y - ego_y)/unit_dist + bound/2.0/unit_dist)
                 ids.append(car_id)
-                angles.append(angle)
+                index = self.orientation_orders.index(orientation)
+                angles.append(angle-ego_car_ang-90*index)
 
             return np.array(X), np.array(Y), np.array(angles), ids
 
