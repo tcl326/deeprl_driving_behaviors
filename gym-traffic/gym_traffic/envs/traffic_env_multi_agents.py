@@ -442,10 +442,10 @@ class TrafficEnvMultiAgents(Env):
             obstacle_image[:,:,1] = (np.clip(rotate(obstacle_image[:,:,1], ego_car_ang, reshape=False, output=np.float), 0, 1))
 
             # plt.imsave('test.jpg', obstacle_image)
-            plt.ion()
+            # plt.ion()
             # plt.imshow(obstacle_image)
-            plt.imshow(obstacle_image[:,:,0])
-            plt.imshow(obstacle_image[:,:,1])
+            # plt.imshow(obstacle_image[:,:,0])
+            # plt.imshow(obstacle_image[:,:,1])
             # plt.imshow(obstacle_image[:,:,2])
             # plt.draw(plt.imshow(obstacle_image))
             # plt.draw()
@@ -453,8 +453,8 @@ class TrafficEnvMultiAgents(Env):
             # time.sleep(5.0)
             # import IPython
             # IPython.embed()
-            plt.show(block=False)
-            plt.show()
+            # plt.show(block=False)
+            # plt.show()
 
         index = self.orientation_orders.index(orientation)
         obstacle_image = np.rot90(obstacle_image, k=index)
