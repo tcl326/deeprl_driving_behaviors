@@ -357,7 +357,7 @@ class TrafficEnvMultiAgents(Env):
         if ego_veh.vehID in traci.vehicle.getIDList():
             ego_car_pos = traci.vehicle.getPosition(ego_veh.vehID)
             ego_car_ang = traci.vehicle.getAngle(ego_veh.vehID)
-            print(orientation, ego_car_pos, ego_car_ang)
+            # print(orientation, ego_car_pos, ego_car_ang)
             ego_car_in_scene = True
 
         for i in traci.vehicle.getIDList():
