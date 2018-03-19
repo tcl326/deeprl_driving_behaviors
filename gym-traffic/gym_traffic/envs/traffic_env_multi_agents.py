@@ -67,6 +67,8 @@ class TrafficEnvMultiAgents(Env):
 
         self.ego_veh_collision_dict = {orientation: False for orientation in self.orientation_orders}
 
+        self.ego_veh_removed_dict = {orientation: False for orientation in self.orientation_orders}
+
         self.braking_time = 0.
 
         self.sumo_running = False
@@ -109,6 +111,9 @@ class TrafficEnvMultiAgents(Env):
 
         self.ego_vehicles_dict = {orientation: self.random_vehicle(self.ego_vehicles_dict_master[orientation]) for orientation in self.orientation_orders}
         self.ego_veh_collision_dict = {orientation: False for orientation in self.orientation_orders}
+
+        self.ego_veh_removed_dict = {orientation: False for orientation in self.orientation_orders}
+
         self.braking_time = 0.
 
         for orientation in self.orientation_orders:
@@ -147,6 +152,8 @@ class TrafficEnvMultiAgents(Env):
             min_dist = 0.
             self.ego_veh_collision_dict[orientation] = True
         if self.ego_veh_collision_dict[orientation] == True:
+            # traci.vehicle.remove(vehID=ego_veh.vehID, reason=2)
+            # traci.vehicle.remove(vehID=ego_veh.vehID, reason=2)
             print("COLLISSION")
         return min_dist
 
@@ -312,7 +319,20 @@ class TrafficEnvMultiAgents(Env):
                    or (self.sumo_step > self.simulation_end)
             done_list.append(done)
 
+        self.remove_collided_cars()
+
+        # plt.imshow(observation_list[0][:,:,0])ex
+        plt.imshow(observation_list[0][:,:,1])
+        plt.show(block=False)
+
         return np.array(observation_list), np.array(reward_list), np.array(done_list), self.route_info
+
+    def remove_collided_cars(self):
+        for orientation in self.orientation_orders:
+            if self.ego_veh_collision_dict[orientation] and not self.ego_veh_removed_dict[orientation]:
+                self.ego_veh_removed_dict[orientation] = True
+                ego_veh = self.ego_vehicles_dict[orientation]
+                traci.vehicle.remove(vehID=ego_veh.vehID, reason=3)
 
     def screenshot(self):
         if self.mode == "gui":
@@ -456,8 +476,8 @@ class TrafficEnvMultiAgents(Env):
             # plt.show(block=False)
             # plt.show()
 
-        index = self.orientation_orders.index(orientation)
-        obstacle_image = np.rot90(obstacle_image, k=index)
+        # index = self.orientation_orders.index(orientation)
+        # obstacle_image = np.rot90(obstacle_image, k=index)
         return obstacle_image
 
     def _reset(self):
