@@ -6,7 +6,7 @@ imageio.plugins.ffmpeg.download()
 from gym_traffic.utils.helper import *
 from gym_traffic.agents.drqn import DRQN
 from IPython import embed
-
+from skimage.transform import resize
 class experience_buffer():
   def __init__(self, buffer_size = 500):
     self.buffer = []
@@ -35,7 +35,7 @@ class DRQNRunner(object):
   def __init__(self, max_steps_per_episode = 1000):
     # self.max_steps_per_episode=max_steps_per_episode
           #Setting the training parameters
-    self.batch_size = 4 #How many experience traces to use for each training step.
+    self.batch_size = 16 #How many experience traces to use for each training step.
     self.trace_length = 8 #How long each experience trace will be when training
     self.update_freq = 5 #How often to perform a training step.
     self.y = .99 #Discount factor on the target Q-values
@@ -98,63 +98,57 @@ class DRQNRunner(object):
         saver.restore(sess,ckpt.model_checkpoint_path)
       sess.run(init)
 
-      updateTarget(targetOps,sess) #Set the target network to be equal to the primary network.
+      updateTarget(targetOps,sess)
       for i in range(self.num_episodes):
         episodeBuffer = []
-        # print ('-------------------', len(episodeBuffer), i, self.num_episodes)
-        #Reset environment and get first new observation
         print ('Episode: ', i)
-        # print ('len(myBuffer.buffer): ', len(myBuffer.buffer))
         sP = env.reset()
-        # s = processState(sP)
-        s = sP
-        d = False
+        s = [None] * 4
+        for v in range(4):
+          s[v] = resize(sP[v], (84, 84))
+        #s = sP
+        d = [False] * 4
         rAll = 0
         j = 0
-        state = (np.zeros([1, self.h_size]),np.zeros([1, self.h_size])) #Reset the recurrent layer's hidden state
-        #The Q-Network
+        state = [[np.zeros([1, self.h_size]),np.zeros([1, self.h_size])]] * 4
+        state1 = [None] * 4
+        a = [None]*4
         while j < self.max_epLength:
           j+=1
-          # print ('Episode: ', i, ' Step: ', j)
-          #Choose an action greedily (with e chance of random action) from the Q-network
-          if np.random.rand(1) < e or total_steps < self.pre_train_steps:
-            state1 = sess.run(mainQN.rnn_state,
-              feed_dict={mainQN.imageIn:[s/255.0],mainQN.trainLength:1,mainQN.state_in:state,mainQN.batch_size:1})
-            #???????????????????????????????? normalized images ??????????????????????????????????????????#
-            # a = np.random.randint(0,4)
-            a = np.random.randint(0,3)
-            assert(a<3)
-          else:
-            a, state1 = sess.run([mainQN.predict,mainQN.rnn_state],
-              feed_dict={mainQN.imageIn:[s/255.0],mainQN.trainLength:1,mainQN.state_in:state,mainQN.batch_size:1})
-            a = a[0]
-            assert(a<3)
-            #???????????????????????????????? normalized images ??????????????????????????????????????????#
-
-          ## observation, reward, done, info = env.step(action)
-          ### Does step return 4 things?
-
+          for v in range(4):
+	          if np.random.rand(1) < e or total_steps < self.pre_train_steps:
+	            state1[v] = sess.run(mainQN.rnn_state,
+	              feed_dict={mainQN.imageIn:[s[v]/255.0],mainQN.trainLength:1,mainQN.state_in:state[v],mainQN.batch_size:1})
+	            
+	            a[v] = np.random.randint(0,3)
+	            assert(a[v]<3)
+	          else:
+	            a[v], state1[v] = sess.run([mainQN.predict,mainQN.rnn_state],
+	              feed_dict={mainQN.imageIn:[s[v]/255.0],mainQN.trainLength:1,mainQN.state_in:state[v],mainQN.batch_size:1})
+	            a[v] = a[v][0]
+	            assert(a[v]<3)
+          #print(a)
+          d_old = d.copy()
           s1P, r, d, info = env.step(a)
-          # s1 = processState(s1P)
-          s1 = s1P
+          #print(d)
+          s1 = [None] * 4
+          for v in range(4):
+            s1[v] = resize(s1P[v], (84, 84))
+          #s1 = s1P
           total_steps += 1
-          episodeBuffer.append(np.reshape(np.array([s,a,r,s1,d]),[1,5]))
+          for v in range(4):
+            if not d_old[v]:
+              episodeBuffer.append(np.reshape(np.array([s[v],a[v],r[v],s1[v],d[v]]),[1,5]))
+           # print(episodeBuffer[-1].shape)
           if total_steps > self.pre_train_steps:
             if e > self.endE:
               e -= stepDrop
 
             if total_steps % (self.update_freq) == 0:
-              # print ("------------- in --------------")
               updateTarget(targetOps,sess)
-              #Reset the recurrent layer's hidden state
               state_train = (np.zeros([self.batch_size, self.h_size]),np.zeros([self.batch_size, self.h_size]))
 
-              trainBatch = myBuffer.sample(self.batch_size, self.trace_length) #Get a random batch of experiences. (32,5)
-              # trainBatch_stacked = tf.stack(trainBatch[:,3])
-              # embed()
-              # print ('trainBatch.shape: ', trainBatch.shape, 'trainBatch[:,3].shape: ', (trainBatch[:,3]/255.0).shape,
-              #   'np.vstack(trainBatch[:,3]/255.0).shape', np.vstack(trainBatch[:,3]/255.0).shape, 'trainBatch_stacked.shape: ', trainBatch_stacked.shape)
-              #Below we perform the Double-DQN update to the target Q-values
+              trainBatch = myBuffer.sample(self.batch_size, self.trace_length)
               trainBatch_st_0 = np.concatenate([arr[np.newaxis] for arr in trainBatch[:,0]])
               trainBatch_st_1 = np.concatenate([arr[np.newaxis] for arr in trainBatch[:,3]])
 
@@ -167,28 +161,29 @@ class DRQNRunner(object):
               end_multiplier = -(trainBatch[:,4] - 1)
               doubleQ = Q2[range(self.batch_size * self.trace_length), Q1]
               targetQ = trainBatch[:,2] + (self.y*doubleQ * end_multiplier)
-              #Update the network with our target values.
+              
               sess.run(mainQN.updateModel, feed_dict={mainQN.imageIn: trainBatch_st_0/255.0,
                 mainQN.targetQ: targetQ, mainQN.actions: trainBatch[:,1], mainQN.trainLength: self.trace_length,
                 mainQN.state_in: state_train, mainQN.batch_size: self.batch_size})
 
-          rAll += r
-          s = s1
-          sP = s1P
-          state = state1
-          if d == True:
-            # print ('********* DONE! *********')
+       	  
+          rAll += np.array([r[i] * (not d_old[i]) for i in range(4)])
+          s = s1.copy()
+          sP = s1P.copy()
+          state = state1.copy()
+          if (d == True).all():
             break
 
         print ('steps taken: ', j)
-        print ('total reward: ', rAll)
-        #Add the episode to the experience buffer
+        print ('total reward: ', np.sum(rAll))
+	       
+             
         if (len(episodeBuffer)>= self.trace_length):
           bufferArray = np.array(episodeBuffer)
           episodeBuffer = list(zip(bufferArray))
           myBuffer.add(episodeBuffer)
         jList.append(j)
-        rList.append(rAll)
+        rList.append(rAll[0])
 
         #Periodically save the model.
         if i % 100 == 0 and i != 0:
