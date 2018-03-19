@@ -309,7 +309,7 @@ class TrafficEnvMultiAgents(Env):
                    or (self.sumo_step > self.simulation_end)
             done_list.append(done)
 
-        return np.array(observation_list), np.sum(reward_list), np.all(done_list), self.route_info
+        return np.array(observation_list), np.array(reward_list), np.array(done_list), self.route_info
 
     def screenshot(self):
         if self.mode == "gui":
