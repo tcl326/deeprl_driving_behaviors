@@ -22,14 +22,14 @@ class TrafficEnvMultiAgentsSimple(TrafficEnvMultiAgents):
                         EgoVehicle('ego_car_s', 'route_sw', 'EgoCarS', 245., 241., 0.)]
 
         ego_vehicles_w = [EgoVehicle('ego_car_w', 'route_we', 'EgoCarW', 245., 261., 0.),
-                        EgoVehicle('ego_car_w', 'route_ws', 'EgoCarW', 245., 261., 0.),
-                        EgoVehicle('ego_car_w', 'route_wn', 'EgoCarW', 245., 241., 0.)]
+                        EgoVehicle('ego_car_w', 'route_ws', 'EgoCarW', 245., 241., 0.),
+                        EgoVehicle('ego_car_w', 'route_wn', 'EgoCarW', 245., 261., 0.)]
 
-        ego_vehicles_n = [EgoVehicle('ego_car_n', 'route_ns', 'EgoCarN', 245., 261., 0.),
-                        EgoVehicle('ego_car_n', 'route_nw', 'EgoCarN', 245., 261., 0.),
-                        EgoVehicle('ego_car_n', 'route_ne', 'EgoCarN', 245., 241., 0.)]
+        ego_vehicles_n = [EgoVehicle('ego_car_n', 'route_ns', 'EgoCarN', 245., 241., 0.),
+                        EgoVehicle('ego_car_n', 'route_nw', 'EgoCarN', 245., 241., 0.),
+                        EgoVehicle('ego_car_n', 'route_ne', 'EgoCarN', 245., 261., 0.)]
 
-        ego_vehicles_e = [EgoVehicle('ego_car_e', 'route_ew', 'EgoCarE', 245., 261., 0.),
+        ego_vehicles_e = [EgoVehicle('ego_car_e', 'route_ew', 'EgoCarE', 245., 241., 0.),
                         EgoVehicle('ego_car_e', 'route_en', 'EgoCarE', 245., 261., 0.),
                         EgoVehicle('ego_car_e', 'route_es', 'EgoCarE', 245., 241., 0.)]
 

@@ -286,6 +286,8 @@ class TrafficEnvMultiAgents(Env):
         self.sumo_step += 1
 
         for orientation in self.orientation_orders:
+            if self.ego_veh_collision_dict[orientation]:
+                continue
             action = actions_dict[orientation]
             if action == 2:
                 self.braking_time += 1
@@ -317,6 +319,8 @@ class TrafficEnvMultiAgents(Env):
             traci.gui.screenshot("View #0", self.pngfile)
 
     def _observation(self, orientation):
+        if self.ego_veh_collision_dict[orientation]:
+            return np.zeros((84, 84, 2))
         state = []
         visible = []
         ego_car_in_scene=False
@@ -325,6 +329,7 @@ class TrafficEnvMultiAgents(Env):
 
         if ego_veh.vehID in traci.vehicle.getIDList():
             ego_car_pos = traci.vehicle.getPosition(ego_veh.vehID)
+            print(orientation, ego_car_pos)
             ego_car_ang = traci.vehicle.getAngle(ego_veh.vehID)
             ego_car_in_scene = True
 
