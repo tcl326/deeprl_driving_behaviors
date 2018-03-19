@@ -146,7 +146,8 @@ class TrafficEnvMultiAgents(Env):
         else:
             min_dist = 0.
             self.ego_veh_collision_dict[orientation] = True
-
+        if self.ego_veh_collision_dict[orientation] == True:
+            print("COLLISSION")
         return min_dist
 
     # choose action based on the Time-To-Collision metric
@@ -279,16 +280,16 @@ class TrafficEnvMultiAgents(Env):
             reward = -1
         return reward
 
-    def _step(self, actions_dict):
+    def _step(self, actions):
         # actions_dict = {'n': actionOfSouthVeh, 'w': actionOfWestVeh, 's': actionOfNorthVeh, 'e': actionOfEastVeh}
         if not self.sumo_running:
             self.start_sumo()
         self.sumo_step += 1
 
-        for orientation in self.orientation_orders:
+        for i, orientation in enumerate(self.orientation_orders):
             if self.ego_veh_collision_dict[orientation]:
                 continue
-            action = actions_dict[orientation]
+            action = actions[i]
             if action == 2:
                 self.braking_time += 1
 
@@ -343,6 +344,7 @@ class TrafficEnvMultiAgents(Env):
             if ego_car_in_scene:
                 if(np.linalg.norm(np.asarray(pos)-np.asarray(ego_car_pos))<42) and i not in ego_veh.vehID: #42 is 42 meters
                     visible.append(state_tuple)
+        print(visible)
 
         def location2bounds(x, y, angle):
             bound = 84
@@ -440,10 +442,10 @@ class TrafficEnvMultiAgents(Env):
             obstacle_image[:,:,1] = (np.clip(rotate(obstacle_image[:,:,1], ego_car_ang, reshape=False, output=np.float), 0, 1))
 
             # plt.imsave('test.jpg', obstacle_image)
-            # plt.ion()
+            plt.ion()
             # plt.imshow(obstacle_image)
-            # plt.imshow(obstacle_image[:,:,0])
-            # plt.imshow(obstacle_image[:,:,1])
+            plt.imshow(obstacle_image[:,:,0])
+            plt.imshow(obstacle_image[:,:,1])
             # plt.imshow(obstacle_image[:,:,2])
             # plt.draw(plt.imshow(obstacle_image))
             # plt.draw()
@@ -451,12 +453,11 @@ class TrafficEnvMultiAgents(Env):
             # time.sleep(5.0)
             # import IPython
             # IPython.embed()
-            # plt.show(block=False)
-            # plt.show()
+            plt.show(block=False)
+            plt.show()
 
-        #TODO: Always return just a obstacle_image, possibly with ego_vehicle in separate channel
         index = self.orientation_orders.index(orientation)
-        obstacle_image = np.rot90(obstacle_image, index)
+        obstacle_image = np.rot90(obstacle_image, k=index)
         return obstacle_image
 
     def _reset(self):
