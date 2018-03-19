@@ -322,8 +322,8 @@ class TrafficEnvMultiAgents(Env):
         self.remove_collided_cars()
 
         # plt.imshow(observation_list[0][:,:,0])ex
-        plt.imshow(observation_list[0][:,:,1])
-        plt.show(block=False)
+        # plt.imshow(observation_list[0][:,:,1])
+        # plt.show(block=False)
 
         return np.array(observation_list), np.array(reward_list), np.array(done_list), self.route_info
 
