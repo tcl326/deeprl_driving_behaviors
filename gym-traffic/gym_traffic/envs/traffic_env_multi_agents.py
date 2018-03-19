@@ -153,10 +153,10 @@ class TrafficEnvMultiAgents(Env):
         else:
             min_dist = 0.
             self.ego_veh_collision_dict[orientation] = True
-        if self.ego_veh_collision_dict[orientation] == True:
+        # if self.ego_veh_collision_dict[orientation] == True:
             # traci.vehicle.remove(vehID=ego_veh.vehID, reason=2)
             # traci.vehicle.remove(vehID=ego_veh.vehID, reason=2)
-            print("COLLISSION")
+            # print("COLLISSION")
         return min_dist
 
     # choose action based on the Time-To-Collision metric
@@ -323,11 +323,11 @@ class TrafficEnvMultiAgents(Env):
 
         self.remove_collided_cars()
 
-        if self.sumo_step%5 == 0:
-        # plt.imshow(observation_list[0][:,:,0])ex
-            plt.imshow(observation_list[3][:,:,1])
-            plt.colorbar()
-            plt.show()
+        # if self.sumo_step%5 == 0:
+        # # plt.imshow(observation_list[0][:,:,0])ex
+        #     plt.imshow(observation_list[3][:,:,1])
+        #     plt.colorbar()
+        #     plt.show()
 
         return np.array(observation_list), np.array(reward_list), np.array(done_list), self.route_info
 
@@ -370,7 +370,7 @@ class TrafficEnvMultiAgents(Env):
             if ego_car_in_scene:
                 if(np.linalg.norm(np.asarray(pos)-np.asarray(ego_car_pos))<42) and i not in ego_veh.vehID: #42 is 42 meters
                     visible.append(state_tuple)
-        print(visible)
+        # print(visible)
         if not ego_car_in_scene:
             bound = 84
             obstacle_image = np.zeros((bound,bound,2))
