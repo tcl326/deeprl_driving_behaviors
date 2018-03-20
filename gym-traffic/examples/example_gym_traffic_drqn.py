@@ -54,10 +54,10 @@ def example(operation, gui):
         runner.run_training(train_env)
     elif (operation == 'test'):
         if gui:
-            train_env = gym.make('Traffic-Simple-gui-v0')
+            train_env = gym.make('Traffic-Multi-gui-v0')
             tester = DRQNTesterGUI()
         else:
-            train_env = gym.make('Traffic-Simple-cli-v0')
+            train_env = gym.make('Traffic-Multi-cli-v0')
             tester = DRQNTester()
         tester.run_testing(train_env)
 
