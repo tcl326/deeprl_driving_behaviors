@@ -8,7 +8,7 @@ from gym_traffic.agents.drqn import DRQN
 from IPython import embed
 from skimage.transform import resize
 class experience_buffer():
-  def __init__(self, buffer_size = 500):
+  def __init__(self, buffer_size = 600):
     self.buffer = []
     self.buffer_size = buffer_size
 
@@ -100,7 +100,7 @@ class DRQNRunner(object):
 
       updateTarget(targetOps,sess)
       for i in range(self.num_episodes):
-        episodeBuffer = []
+        episodeBuffer = [[]] * 4
         print ('Episode: ', i)
         sP = env.reset()
         s = [None] * 4
@@ -130,6 +130,9 @@ class DRQNRunner(object):
           #print(a)
           d_old = d.copy()
           s1P, r, d, info = env.step(a)
+          #print(type(d))          
+          if isinstance(d, bool):
+            d = [True] * 4
           #print(d)
           s1 = [None] * 4
           for v in range(4):
@@ -138,7 +141,22 @@ class DRQNRunner(object):
           total_steps += 1
           for v in range(4):
             if not d_old[v]:
-              episodeBuffer.append(np.reshape(np.array([s[v],a[v],r[v],s1[v],d[v]]),[1,5]))
+              s_ = np.array(s[v], dtype = np.int16)
+              a_ = np.array(a[v], dtype = np.int16)
+              r_ = np.array(r[v], dtype = np.int16)
+              s1_ = np.array(s1[v], dtype = np.int16)
+              d_ = np.array(d[v], dtype = np.int16)
+
+              episodeBuffer[v].append(np.reshape(np.array([s_,a_,r_,s1_,d_]),[1,5]))
+              # print(episodeBuffer[-1].shape)
+              # except:
+              #   print(s)
+              #   print(a)
+              #   print(r)
+              #   print(s1)
+              #   print(d)
+              #   print(d_old)
+              #   break
            # print(episodeBuffer[-1].shape)
           if total_steps > self.pre_train_steps:
             if e > self.endE:
@@ -149,8 +167,8 @@ class DRQNRunner(object):
               state_train = (np.zeros([self.batch_size, self.h_size]),np.zeros([self.batch_size, self.h_size]))
 
               trainBatch = myBuffer.sample(self.batch_size, self.trace_length)
-              trainBatch_st_0 = np.concatenate([arr[np.newaxis] for arr in trainBatch[:,0]])
-              trainBatch_st_1 = np.concatenate([arr[np.newaxis] for arr in trainBatch[:,3]])
+              trainBatch_st_0 = np.concatenate([arr[np.newaxis] for arr in trainBatch[:,0]]).astype(float)
+              trainBatch_st_1 = np.concatenate([arr[np.newaxis] for arr in trainBatch[:,3]]).astype(float)
 
               Q1 = sess.run(mainQN.predict, feed_dict={mainQN.imageIn:trainBatch_st_1/255.0,
                 mainQN.trainLength: self.trace_length, mainQN.state_in: state_train, mainQN.batch_size: self.batch_size})
@@ -166,22 +184,24 @@ class DRQNRunner(object):
                 mainQN.targetQ: targetQ, mainQN.actions: trainBatch[:,1], mainQN.trainLength: self.trace_length,
                 mainQN.state_in: state_train, mainQN.batch_size: self.batch_size})
 
-       	  
+       	 
+          #print(np.array([r[i] * (not d_old[i]) for i in range(4)])) 
           rAll += np.array([r[i] * (not d_old[i]) for i in range(4)])
           s = s1.copy()
           sP = s1P.copy()
           state = state1.copy()
-          if (d == True).all():
+          if all(d):
             break
 
         print ('steps taken: ', j)
-        print ('total reward: ', np.sum(rAll))
-	       
+        print ('total reward: ', rAll)  
+        print('Average reward: ' + str(np.mean(rAll)))   
              
-        if (len(episodeBuffer)>= self.trace_length):
-          bufferArray = np.array(episodeBuffer)
-          episodeBuffer = list(zip(bufferArray))
-          myBuffer.add(episodeBuffer)
+        for v in range(4):
+          if (len(episodeBuffer[v])>= self.trace_length):
+            bufferArray = np.array(episodeBuffer[v])
+            episodeBuffer[v] = list(zip(bufferArray))
+            myBuffer.add(episodeBuffer[v])
         jList.append(j)
         rList.append(rAll[0])
 
@@ -191,6 +211,6 @@ class DRQNRunner(object):
             print ("Saved Model")
         if len(rList) % self.summaryLength == 0 and len(rList) != 0:
             print (total_steps,np.mean(rList[-self.summaryLength:]), e)
-            saveToCenter(i,rList,jList,np.reshape(np.array(episodeBuffer), [len(episodeBuffer),5]), self.summaryLength,
+            saveToCenter(i,rList,jList,np.reshape(np.array(episodeBuffer[0]), [len(episodeBuffer[0]),5]), self.summaryLength,
               self.h_size, sess, mainQN, self.time_per_step)
       saver.save(sess,self.path+'/model-'+str(i)+'.cptk')
