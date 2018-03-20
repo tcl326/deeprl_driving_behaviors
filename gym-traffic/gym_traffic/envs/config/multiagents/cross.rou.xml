@@ -21,6 +21,4 @@
 
     <route id="route_wn" edges="w_0 0_n"/>
     <route id="route_ws" edges="w_0 0_s"/>
-
-    <flow depart="1" id="flow_w_e" route="route_we" type="Car" begin="0" probability="0.01" />
 </routes>
