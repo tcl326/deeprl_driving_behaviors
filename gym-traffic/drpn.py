@@ -1,0 +1,158 @@
+import argparse
+import gym
+import gym_traffic
+import numpy as np
+from itertools import count
+from collections import namedtuple
+from skimage.transform import resize
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from torch.autograd import Variable
+from torch.distributions import Categorical
+import pdb
+
+
+parser = argparse.ArgumentParser(description='PyTorch actor-critic example')
+parser.add_argument('--gamma', type=float, default=0.99, metavar='G',
+                    help='discount factor (default: 0.99)')
+parser.add_argument('--seed', type=int, default=543, metavar='N',
+                    help='random seed (default: 1)')
+parser.add_argument('--render', action='store_true',
+                    help='render the environment')
+parser.add_argument('--log-interval', type=int, default=10, metavar='N',
+                    help='interval between training status logs (default: 10)')
+args = parser.parse_args()
+
+
+env = gym.make('Traffic-Multi-gui-v0')
+env.seed(args.seed)
+torch.manual_seed(args.seed)
+
+
+SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
+
+
+class Policy(nn.Module):
+    def __init__(self, num_agents):
+        super(Policy, self).__init__()
+        # self.affine1 = nn.Linear(4, 128)
+        # self.action_head = nn.Linear(128, 2)
+        self.conv1 = nn.Conv2d(2, 32, (8,8), (4,4))
+        self.conv2 = nn.Conv2d(32, 64, (4,4), (2,2))
+        self.conv3 = nn.Conv2d(64, 64, (3,3), (1,1))
+        self.conv4 = nn.Conv2d(64, 512, (7,7), (1,1))
+        self.action1 = nn.Linear(512, 256)
+        self.action2 = nn.Linear(256, 64)
+        self.action_head = nn.Linear(64, 3)
+        self.value1 = nn.Linear(512, 256)
+        self.value2 = nn.Linear(256, 64)
+        self.value_head = nn.Linear(64, 1)
+        self.num_agents = num_agents
+        self.agent_ids = [num for num in range(num_agents)]
+        self.live_agents = list(self.agent_ids)
+        self.saved_actions_dict = {num:[] for num in range(self.num_agents)}
+        self.rewards_dict = {num:[] for num in range(self.num_agents)}
+
+    def forward(self, x):
+        conv1 = F.relu(self.conv1(x))
+        conv2 = F.relu(self.conv2(conv1))
+        conv3 = F.relu(self.conv3(conv2))
+        conv4 = F.relu(self.conv4(conv3))
+        # print(conv3.size())
+        # print(conv4.size())
+        flatten = conv4.view(1,-1)
+        # print(flatten.size())
+        action = F.relu(self.action1(flatten))
+        action = F.relu(self.action2(action))
+        action_scores = self.action_head(action)
+        value = F.relu(self.value1(flatten))
+        value = F.relu(self.value2(value))
+        state_values = self.value_head(value)
+        return F.softmax(action_scores, dim=-1), state_values
+
+
+model = Policy(num_agents=4)
+print(model)
+optimizer = optim.Adam(model.parameters(), lr=0.0001)
+
+
+def select_action(state, agent_id):
+    state = torch.from_numpy(state).float()
+    probs, state_value = model(Variable(state).unsqueeze(0))
+    m = Categorical(probs)
+    action = m.sample()
+    model.saved_actions_dict[agent_id].append(SavedAction(m.log_prob(action), state_value))
+    return action.data[0]
+
+
+def finish_episode():
+    saved_actions_dict = model.saved_actions_dict
+    rewards_dict = {num:[] for num in range(model.num_agents)}
+    policy_losses = []
+    value_losses = []
+
+    for agent_id in range(model.num_agents):
+        R = 0
+        for r in model.rewards_dict[agent_id][::-1]:
+            R = r + args.gamma * R
+            rewards_dict[agent_id].insert(0, R)
+        rewards_dict[agent_id] = torch.Tensor(rewards_dict[agent_id])
+        rewards_dict[agent_id] = (rewards_dict[agent_id] - rewards_dict[agent_id].mean()) / (rewards_dict[agent_id].std() + np.finfo(np.float32).eps)
+        # pdb.set_trace()
+        for (log_prob, value), r in zip(saved_actions_dict[agent_id], rewards_dict[agent_id]):
+            reward = r - value.data[0]
+            policy_losses.append(-log_prob * Variable(reward))
+            value_losses.append(F.smooth_l1_loss(value, Variable(torch.Tensor([r]))))
+    optimizer.zero_grad()
+    # print(value_losses)
+    # print(policy_losses)
+    loss = torch.stack(policy_losses).sum()/float(model.num_agents) + torch.stack(value_losses).sum()/float(model.num_agents)
+    loss.backward()
+    optimizer.step()
+    model.rewards_dict.clear()
+    model.saved_actions_dict.clear()
+
+
+def main():
+    running_reward = 0
+    for i_episode in count(1):
+        states = env.reset()
+        model.live_agents = list(model.agent_ids)
+        model.saved_actions_dict = {num:[] for num in range(model.num_agents)}
+        model.rewards_dict = {num:[] for num in range(model.num_agents)}
+        for t in range(10000):  # Don't infinite loop while learning
+            actions = np.zeros(model.num_agents)
+            for agent_id in model.live_agents:
+                state = states[agent_id]
+                state = resize(state,(84, 84))
+                state = state.T
+                actions[agent_id] = select_action(state, agent_id)
+            states, rewards, done, info_dict = env.step(actions)
+            done_list = info_dict["done"]
+            if args.render:
+                env.render()
+            for agent_id in model.live_agents:
+                if done_list[agent_id]:
+                    model.live_agents.remove(agent_id)
+                model.rewards_dict[agent_id].append(rewards[agent_id])
+            if done:
+                break
+        total_reward = sum([np.mean(model.rewards_dict[idx]) for idx in range(model.num_agents)])
+        running_reward = running_reward * 0.99 + total_reward * 0.01
+        finish_episode()
+        print('Episode {}\tLast length: {:5d}\tAverage length: {:.2f}'.format(
+            i_episode, t, running_reward))
+        if i_episode % args.log_interval == 0:
+            print('Episode {}\tLast length: {:5d}\tAverage length: {:.2f}'.format(
+                i_episode, t, running_reward))
+        # if running_reward > env.spec.reward_threshold:
+        #     print("Solved! Running reward is now {} and "
+        #           "the last episode runs to {} time steps!".format(running_reward, t))
+        #     break
+
+
+if __name__ == '__main__':
+    main()
