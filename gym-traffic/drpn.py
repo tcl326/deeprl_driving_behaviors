@@ -5,6 +5,7 @@ import numpy as np
 from itertools import count
 from collections import namedtuple
 from skimage.transform import resize
+import shutil
 
 import torch
 import torch.nn as nn
@@ -12,6 +13,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
 from torch.distributions import Categorical
+from logger import Logger
 import pdb
 
 
@@ -27,7 +29,7 @@ parser.add_argument('--log-interval', type=int, default=10, metavar='N',
 args = parser.parse_args()
 
 
-env = gym.make('Traffic-Multi-gui-v0')
+env = gym.make('Traffic-Multi-cli-v0')
 env.seed(args.seed)
 torch.manual_seed(args.seed)
 
@@ -78,7 +80,6 @@ model = Policy(num_agents=4)
 print(model)
 optimizer = optim.Adam(model.parameters(), lr=0.0001)
 
-
 def select_action(state, agent_id):
     state = torch.from_numpy(state).float()
     probs, state_value = model(Variable(state).unsqueeze(0))
@@ -114,10 +115,20 @@ def finish_episode():
     optimizer.step()
     model.rewards_dict.clear()
     model.saved_actions_dict.clear()
+    return loss
 
+def save_checkpoint(state, is_best, filename='model/multiple/checkpoint.pth.tar'):
+    print("save checkpoint")
+    torch.save(state, filename)
+    if is_best:
+        shutil.copyfile(filename, 'model/multiple/model_best.pth.tar')
 
 def main():
+    log_path = 'log'
+    logger = Logger(log_path, 'multiple')
+    is_best = False
     running_reward = 0
+    max_reward = -float('inf')
     for i_episode in count(1):
         states = env.reset()
         model.live_agents = list(model.agent_ids)
@@ -142,16 +153,29 @@ def main():
                 break
         total_reward = sum([np.mean(model.rewards_dict[idx]) for idx in range(model.num_agents)])
         running_reward = running_reward * 0.99 + total_reward * 0.01
-        finish_episode()
-        print('Episode {}\tLast length: {:5d}\tAverage length: {:.2f}'.format(
-            i_episode, t, running_reward))
+        loss = finish_episode()
+
+
+
+        logger.scalar_summary('loss', loss.data[0], i_episode)
+        logger.scalar_summary('reward', total_reward, i_episode)
+
+        if total_reward > max_reward:
+            max_reward = total_reward
+            is_best = True
+        else:
+            is_best = False
+
+        save_checkpoint({
+                    'episode': i_episode,
+                    'state_dict': model.state_dict(),
+                    'best_reward': max_reward,
+                    'optimizer': optimizer.state_dict(),
+                }, is_best)
+
         if i_episode % args.log_interval == 0:
-            print('Episode {}\tLast length: {:5d}\tAverage length: {:.2f}'.format(
-                i_episode, t, running_reward))
-        # if running_reward > env.spec.reward_threshold:
-        #     print("Solved! Running reward is now {} and "
-        #           "the last episode runs to {} time steps!".format(running_reward, t))
-        #     break
+            print('Episode {}\tLast Reward: {:5f}\Best Reward: {:.2f}'.format(
+                i_episode, total_reward, max_reward))
 
 
 if __name__ == '__main__':

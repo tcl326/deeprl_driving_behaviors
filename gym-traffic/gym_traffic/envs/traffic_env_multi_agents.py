@@ -158,125 +158,6 @@ class TrafficEnvMultiAgents(Env):
             # traci.vehicle.remove(vehID=ego_veh.vehID, reason=2)
             # print("COLLISSION")
         return min_dist
-
-    # choose action based on the Time-To-Collision metric
-    # def action_from_ttc(self):
-    #     ego_id = self.ego_veh.vehID
-    #     ego_ang = traci.vehicle.getAngle(ego_id) * math.pi / 180.0 # in radian (clockwise)
-    #     ego_vel = traci.vehicle.getSpeed(ego_id)  # in m/s
-    #     # NOTE different coordinate system for angle and pose!
-    #     ego_vel_x = ego_vel * math.sin(ego_ang)
-    #     ego_vel_y = ego_vel * math.cos(ego_ang)
-    #     # calculate position of vehicle center instead of front bumper
-    #     ego_pos = np.array(traci.vehicle.getPosition(ego_id))
-    #     # ego_pos[0] = ego_pos[0] - 2.5*math.cos(ego_ang)
-    #     # ego_pos[1] = ego_pos[1] - 2.5*math.sin(ego_ang)
-    #
-    #     # initialize
-    #     min_ttc = 10
-    #     action  = -1
-    #     front_warning = False
-    #     pre_collision = False
-    #
-    #     routeID = self.ego_veh.routeID
-    #     # straight cross
-    #     if routeID == 'route_sn':
-    #         for i in traci.vehicle.getIDList():
-    #             # excluding ego vehicle AND NS traffic for comparison
-    #             if i != ego_id and i.find('flow_n_s') == -1:
-    #                 new_ang = traci.vehicle.getAngle(i) * math.pi / 180.0 # in radian (clockwise)
-    #                 new_vel = traci.vehicle.getSpeed(i) # in m/s
-    #                 new_vel_x = new_vel * math.sin(new_ang)
-    #                 new_vel_y = new_vel * math.cos(new_ang)
-    #                 new_pos = np.array(traci.vehicle.getPosition(i)) # in m
-    #
-    #                 rel_vel = np.linalg.norm([ego_vel_x - new_vel_x, ego_vel_y - new_vel_y])
-    #                 rel_dist = np.linalg.norm(ego_pos - new_pos)
-    #                 new_ttc = rel_dist / rel_vel
-    #
-    #                 rel_ang = math.atan2(new_pos[0] - ego_pos[0], new_pos[1] - ego_pos[1]) # in radian
-    #                 if rel_ang < 0.0:
-    #                     rel_ang = 2*math.pi + rel_ang
-    #
-    #                 if abs(rel_ang - ego_ang) < 0.5 and rel_dist < 10.0:
-    #                     front_warning = True
-    #                     if rel_dist < 2.0:
-    #                         pre_collision = True
-    #
-    #                 if new_ttc < min_ttc:
-    #                     min_ttc = new_ttc
-    #     # left turn
-    #     elif routeID == 'route_sw':
-    #         for i in traci.vehicle.getIDList():
-    #             # excluding ego vehicle for comparison only
-    #             if i != ego_id:
-    #                 new_ang = traci.vehicle.getAngle(i) * math.pi / 180.0 # in radian (clockwise)
-    #                 new_vel = traci.vehicle.getSpeed(i) # in m/s
-    #                 new_vel_x = new_vel * math.sin(new_ang)
-    #                 new_vel_y = new_vel * math.cos(new_ang)
-    #                 new_pos = np.array(traci.vehicle.getPosition(i)) # in m
-    #
-    #                 rel_vel = np.linalg.norm([ego_vel_x - new_vel_x, ego_vel_y - new_vel_y])
-    #                 rel_dist = np.linalg.norm(ego_pos - new_pos)
-    #                 new_ttc = rel_dist / rel_vel
-    #
-    #                 rel_ang = math.atan2(new_pos[0] - ego_pos[0], new_pos[1] - ego_pos[1]) # in radian
-    #                 if rel_ang < 0.0:
-    #                     rel_ang = 2*math.pi + rel_ang
-    #
-    #                 if abs(rel_ang - ego_ang) < 0.5 and rel_dist < 10.0:
-    #                     front_warning = True
-    #                     if rel_dist < 2.0:
-    #                         pre_collision = True
-    #
-    #                 if new_ttc < min_ttc:
-    #                     min_ttc = new_ttc
-    #
-    #     # right turn
-    #     elif routeID == 'route_se':
-    #         for i in traci.vehicle.getIDList():
-    #             # ONLY take WE traffic for comparison
-    #             if i.find('flow_w_e') != -1:
-    #                 new_ang = traci.vehicle.getAngle(i) * math.pi / 180.0 # in radian (clockwise)
-    #                 new_vel = traci.vehicle.getSpeed(i) # in m/s
-    #                 new_vel_x = new_vel * math.sin(new_ang)
-    #                 new_vel_y = new_vel * math.cos(new_ang)
-    #                 new_pos = np.array(traci.vehicle.getPosition(i)) # in m
-    #
-    #                 rel_vel = np.linalg.norm([ego_vel_x - new_vel_x, ego_vel_y - new_vel_y])
-    #                 rel_dist = np.linalg.norm(ego_pos - new_pos)
-    #                 new_ttc = rel_dist / rel_vel
-    #
-    #                 rel_ang = math.atan2(new_pos[0] - ego_pos[0], new_pos[1] - ego_pos[1]) # in radian
-    #                 if rel_ang < 0.0:
-    #                     rel_ang = 2*math.pi + rel_ang
-    #
-    #                 if abs(rel_ang - ego_ang) < 0.5 and rel_dist < 10.0:
-    #                     front_warning = True
-    #                     if rel_dist < 2.0:
-    #                         pre_collision = True
-    #
-    #                 if new_ttc < min_ttc:
-    #                     min_ttc = new_ttc
-    #
-    #     else:
-    #         print('Invalid route for ego-vehicle. No action will be taken.')
-    #
-    #     # decision making based on min time-to-collision
-    #     if (front_warning and min_ttc < 3.0) or pre_collision:
-    #         action = 2
-    #     else:
-    #         if min_ttc > 2.0 or abs(ego_pos[0] - 250) > 3 or ego_pos[1] - 250 > 2:
-    #             action = 1
-    #         elif min_ttc < 1.5:
-    #             action = 2
-    #         else:
-    #             action = 0
-    #
-    #     # print 'min ttc: ', min_ttc, ' front warning: ', front_warning
-    #
-    #     return action
-
     # TODO: Refine reward function!!
     def _reward(self, orientation, min_dist, ego_vehicle):
         if self.ego_veh_collision_dict[orientation]:
@@ -328,8 +209,8 @@ class TrafficEnvMultiAgents(Env):
         #     plt.imshow(observation_list[2][:,:,1])
         #     plt.colorbar()
         #     plt.show()
-
-        return np.array(observation_list), np.array(reward_list), np.array(done_list), self.route_info
+        info = {"route_info": self.route_info, "done":done_list}
+        return np.array(observation_list), np.array(reward_list), np.all(done_list), info
 
     def remove_collided_cars(self):
         for orientation in self.orientation_orders:
@@ -471,23 +352,6 @@ class TrafficEnvMultiAgents(Env):
         return np.flipud(obstacle_image)
 
     def _reset(self):
-        # if self.sumo_running:
-        #     traci.vehicle.remove(vehID=self.ego_veh.vehID, reason=2)
-        #     traci.simulation.clearPending()
-        #     self.sumo_step = 0
-        #     for i in range(800):
-        #         traci.simulationStep()
-        #     self.ego_veh = random.choice(self.ego_vehicles)
-        #     self.ego_veh_collision = False
-        #     traci.vehicle.add(vehID=self.ego_veh.vehID, routeID=self.ego_veh.routeID,
-        #                       pos=self.ego_veh.start_pos, speed=self.ego_veh.start_speed, typeID=self.ego_veh.typeID)
-        #     traci.vehicle.setSpeedMode(vehID=self.ego_veh.vehID, sm=0) # All speed checks are off
-        # else:
-        #     # self.stop_sumo()
-        #     self.ego_veh = random.choice(self.ego_vehicles)
-        #     # sleep required on some systems
-        #     if self.sleep_between_restart > 0:
-        #         time.sleep(self.sleep_between_restart)
         self.start_sumo()
         observations = []
         for orientation in self.orientation_orders:
