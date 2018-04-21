@@ -29,7 +29,7 @@ parser.add_argument('--log-interval', type=int, default=10, metavar='N',
 args = parser.parse_args()
 
 
-env = gym.make('Traffic-Multi-gui-v0')
+env = gym.make('Traffic-Multi-cli-v0')
 env.seed(args.seed)
 torch.manual_seed(args.seed)
 
