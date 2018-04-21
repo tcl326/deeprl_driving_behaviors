@@ -131,11 +131,11 @@ def finish_episode():
     model.saved_actions_dict.clear()
     return loss
 
-def save_checkpoint(state, is_best, filename='model/multiple/checkpoint.pth.tar'):
+def save_checkpoint(state, is_best, filename='model/multiple_recurrent/checkpoint.pth.tar'):
     print("save checkpoint")
     torch.save(state, filename)
     if is_best:
-        shutil.copyfile(filename, 'model/multiple/model_best.pth.tar')
+        shutil.copyfile(filename, 'model/multiple_recurrent/model_best.pth.tar')
 
 def repackage_hidden(h):
     """Wraps hidden states in new Variables, to detach them from their history."""
@@ -146,7 +146,7 @@ def repackage_hidden(h):
 
 def main():
     log_path = 'log'
-    logger = Logger(log_path, 'multiple')
+    logger = Logger(log_path, 'multiple_recurrent')
     is_best = False
     running_reward = 0
     max_reward = -float('inf')
