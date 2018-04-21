@@ -29,7 +29,7 @@ parser.add_argument('--log-interval', type=int, default=10, metavar='N',
 args = parser.parse_args()
 
 
-env = gym.make('Traffic-Multi-gui-v0')
+env = gym.make('Traffic-Multi-cli-v0')
 env.seed(args.seed)
 torch.manual_seed(args.seed)
 
@@ -46,47 +46,33 @@ class Policy(nn.Module):
         self.conv2 = nn.Conv2d(32, 64, (4,4), (2,2))
         self.conv3 = nn.Conv2d(64, 64, (3,3), (1,1))
         self.conv4 = nn.Conv2d(64, 512, (7,7), (1,1))
-        self.rnn1 = nn.LSTM(input_size=512, hidden_size=256, num_layers=2)
-        self.action1 = nn.Linear(256, 128)
-        self.action2 = nn.Linear(128, 64)
+        self.action1 = nn.Linear(512, 256)
+        self.action2 = nn.Linear(256, 64)
         self.action_head = nn.Linear(64, 3)
-        self.value1 = nn.Linear(256, 128)
-        self.value2 = nn.Linear(128, 64)
+        self.value1 = nn.Linear(512, 256)
+        self.value2 = nn.Linear(256, 64)
         self.value_head = nn.Linear(64, 1)
         self.num_agents = num_agents
         self.agent_ids = [num for num in range(num_agents)]
         self.live_agents = list(self.agent_ids)
         self.saved_actions_dict = {num:[] for num in range(self.num_agents)}
         self.rewards_dict = {num:[] for num in range(self.num_agents)}
-        self.h_n_dict = {num:None for num in range(self.num_agents)}
-        self.c_n_dict = {num:None for num in range(self.num_agents)}
-        # self.h_n = torch.randn(2, 3, 20)
-        # self.c_n = torch.randn(2, 3, 20)
-        self.time_steps = 1
 
-    def forward(self, x, agent_id):
+    def forward(self, x):
         conv1 = F.relu(self.conv1(x))
         conv2 = F.relu(self.conv2(conv1))
         conv3 = F.relu(self.conv3(conv2))
         conv4 = F.relu(self.conv4(conv3))
         # print(conv3.size())
         # print(conv4.size())
-        flatten = conv4.view(self.time_steps,1,-1)
-        if self.reset or not self.h_n_dict[agent_id] or not self.c_n_dict[agent_id]:
-            lstm1, (self.h_n_dict[agent_id], self.c_n_dict[agent_id]) = self.rnn1(flatten)
-        else:
-            lstm1, (self.h_n_dict[agent_id], self.c_n_dict[agent_id]) = self.rnn1(flatten, (self.h_n_dict[agent_id], self.c_n_dict[agent_id]))
-            self.reset = False
+        flatten = conv4.view(1,-1)
         # print(flatten.size())
-        flatten = lstm1.view(1, -1)
         action = F.relu(self.action1(flatten))
         action = F.relu(self.action2(action))
         action_scores = self.action_head(action)
-        # print(action_scores)
         value = F.relu(self.value1(flatten))
         value = F.relu(self.value2(value))
         state_values = self.value_head(value)
-        # print(state_values)
         return F.softmax(action_scores, dim=-1), state_values
 
 
@@ -96,7 +82,7 @@ optimizer = optim.Adam(model.parameters(), lr=0.0001)
 
 def select_action(state, agent_id):
     state = torch.from_numpy(state).float()
-    probs, state_value = model(Variable(state).unsqueeze(0), agent_id)
+    probs, state_value = model(Variable(state).unsqueeze(0))
     m = Categorical(probs)
     action = m.sample()
     model.saved_actions_dict[agent_id].append(SavedAction(m.log_prob(action), state_value))
@@ -137,30 +123,18 @@ def save_checkpoint(state, is_best, filename='model/multiple/checkpoint.pth.tar'
     if is_best:
         shutil.copyfile(filename, 'model/multiple/model_best.pth.tar')
 
-def repackage_hidden(h):
-    """Wraps hidden states in new Variables, to detach them from their history."""
-    if type(h) == Variable:
-        return Variable(h.data)
-    else:
-        return tuple(repackage_hidden(v) for v in h)
-
 def main():
     log_path = 'log'
     logger = Logger(log_path, 'multiple')
     is_best = False
     running_reward = 0
     max_reward = -float('inf')
-    BPTT = 10
     for i_episode in count(1):
         states = env.reset()
         model.live_agents = list(model.agent_ids)
         model.saved_actions_dict = {num:[] for num in range(model.num_agents)}
         model.rewards_dict = {num:[] for num in range(model.num_agents)}
-        model.reset = True
         for t in range(10000):  # Don't infinite loop while learning
-            if t % BPTT == 0:
-                for agent_id in model.live_agents:
-                    (model.h_n_dict[agent_id], model.c_n_dict[agent_id]) = repackage_hidden((model.h_n_dict[agent_id], model.c_n_dict[agent_id]))
             actions = np.zeros(model.num_agents)
             for agent_id in model.live_agents:
                 state = states[agent_id]
