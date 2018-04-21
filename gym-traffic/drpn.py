@@ -158,7 +158,7 @@ def main():
         model.rewards_dict = {num:[] for num in range(model.num_agents)}
         model.reset = True
         for t in range(10000):  # Don't infinite loop while learning
-            if t % BPTT == 0:
+            if t % BPTT == 0 and t != 0:
                 for agent_id in model.live_agents:
                     (model.h_n_dict[agent_id], model.c_n_dict[agent_id]) = repackage_hidden((model.h_n_dict[agent_id], model.c_n_dict[agent_id]))
             actions = np.zeros(model.num_agents)
@@ -178,6 +178,7 @@ def main():
             if done:
                 break
         total_reward = sum([np.mean(model.rewards_dict[idx]) for idx in range(model.num_agents)])
+        print(total_reward)
         running_reward = running_reward * 0.99 + total_reward * 0.01
         loss = finish_episode()
 
