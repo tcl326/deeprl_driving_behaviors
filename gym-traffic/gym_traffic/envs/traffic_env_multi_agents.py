@@ -75,6 +75,7 @@ class TrafficEnvMultiAgents(Env):
 
         self.sumo_running = False
         self.viewer = None
+        self.prev_done_list = [False for orientation in self.orientation_orders]
 
     def random_vehicle(self, ego_vehicles_list):
         # print(ego_vehicles_list)
@@ -188,7 +189,6 @@ class TrafficEnvMultiAgents(Env):
 
         # print("Step = ", self.sumo_step, "   | action = ", action)
         # print("car speed = ", traci.vehicle.getSpeed(self.ego_veh.vehID), "   | new speed = ",new_speed)
-
         traci.simulationStep()
         observation_list = []
         reward_list = []
@@ -196,12 +196,15 @@ class TrafficEnvMultiAgents(Env):
         for i, orientation in enumerate(self.orientation_orders):
             observation_list.append(self._observation(orientation))
             min_dist = self.check_collision(orientation, observation_list[i])
-            reward_list.append(self._reward(orientation, min_dist, self.ego_vehicles_dict[orientation]))
+            if self.prev_done_list[i]:
+                reward_list.append(0)
+            else:
+                reward_list.append(self._reward(orientation, min_dist, self.ego_vehicles_dict[orientation]))
             done = self.ego_veh_collision_dict[orientation] \
                    or self.ego_vehicles_dict[orientation].reached_goal(traci.vehicle.getPosition(self.ego_vehicles_dict[orientation].vehID)) \
                    or (self.sumo_step > self.simulation_end)
             done_list.append(done)
-
+        self.prev_done_list = list(done_list)
         self.remove_collided_cars()
 
         # if self.sumo_step%5 == 0:
@@ -209,7 +212,7 @@ class TrafficEnvMultiAgents(Env):
         #     plt.imshow(observation_list[2][:,:,1])
         #     plt.colorbar()
         #     plt.show()
-        info = {"route_info": self.route_info, "done":done_list}
+        info = {"route_info": self.route_info, "done":done_list, "collision": [self.ego_veh_collision_dict[orientation] for orientation in self.orientation_orders]}
         return np.array(observation_list), np.array(reward_list), np.all(done_list), info
 
     def remove_collided_cars(self):
@@ -274,8 +277,8 @@ class TrafficEnvMultiAgents(Env):
             # plt.show(block=False)
             # plt.show()
 
-        index = self.orientation_orders.index(orientation)
-        obstacle_image = np.rot90(obstacle_image, k=index)
+        # index = self.orientation_orders.index(orientation)
+        # obstacle_image = np.rot90(obstacle_image, k=index)
         return obstacle_image
 
     def render_scene(self, visible, ego_car_pos, ego_car_ang, orientation):
@@ -328,11 +331,18 @@ class TrafficEnvMultiAgents(Env):
             X, Y, angles, ids = [], [], [], []
             ego_x, ego_y = ego_car_pos[0], ego_car_pos[1]
             for car_id,pos_x, pos_y, angle, speed, laneid in visible:
-                X.append((pos_x - ego_x)/unit_dist + bound/2.0/unit_dist)
-                Y.append((pos_y - ego_y)/unit_dist + bound/2.0/unit_dist)
+                # X.append((pos_x - ego_x)/unit_dist + bound/2.0/unit_dist)
+                # Y.append((pos_y - ego_y)/unit_dist + bound/2.0/unit_dist)
+                normed_angle = np.deg2rad(ego_car_ang)
+                X.append(((pos_x-ego_x) * np.cos(normed_angle) - (pos_y-ego_y) * np.sin(normed_angle))/unit_dist + bound/2.0/unit_dist)
+                Y.append(((pos_x-ego_x) * np.sin(normed_angle) + (pos_y-ego_y) * np.cos(normed_angle))/unit_dist + bound/2.0/unit_dist)
                 ids.append(car_id)
                 index = self.orientation_orders.index(orientation)
-                angles.append(angle-ego_car_ang-90*index)
+                # index = 0
+                if angle-ego_car_ang >= 0:
+                    angles.append(angle-ego_car_ang)
+                else:
+                    angles.append(angle-ego_car_ang + 360)
 
             return np.array(X), np.array(Y), np.array(angles), ids
 
@@ -348,8 +358,10 @@ class TrafficEnvMultiAgents(Env):
         # Y = np.clip(Y, 0, int(bound/unit_dist)-1)
 
         obstacle_image = draw_scene(X, Y, angles, car_template_y, car_template_x, bound, ids)
-
-        return np.flipud(obstacle_image)
+        # print(orientation)
+        # print(visible)
+        # print(ego_car_pos, ego_car_ang)
+        return obstacle_image
 
     def _reset(self):
         self.start_sumo()

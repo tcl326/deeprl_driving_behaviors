@@ -15,6 +15,7 @@ from torch.autograd import Variable
 from torch.distributions import Categorical
 from logger import Logger
 import pdb
+import os
 # import cv2
 
 
@@ -30,7 +31,7 @@ parser.add_argument('--log-interval', type=int, default=10, metavar='N',
 args = parser.parse_args()
 
 
-env = gym.make('Traffic-Multi-cli-v0')
+env = gym.make('Traffic-Multi-gui-v0')
 env.seed(args.seed)
 torch.manual_seed(args.seed)
 
@@ -91,15 +92,15 @@ class Policy(nn.Module):
         return F.softmax(action_scores, dim=-1), state_values
 
 
-model = Policy(num_agents=4)
-print(model)
-optimizer = optim.Adam(model.parameters(), lr=0.0001)
+# model = Policy(num_agents=4)
+# print(model)
+# optimizer = optim.Adam(model.parameters(), lr=0.0001)
 
 def select_action(state, agent_id):
-    # if agent_id == 0:
-    #     # print(state.shape)
-    #     cv2.imshow('image',state[0,:,:] + state[1,:,:])
-    #     cv2.waitKey(1)
+    # if agent_id == 1:
+        # print(state.shape)
+    # cv2.imshow('image' + str(agent_id),state[0,:,:] + state[1,:,:])
+    # cv2.waitKey(1)
     state = torch.from_numpy(state).float()
     probs, state_value = model(Variable(state).unsqueeze(0), agent_id)
     m = Categorical(probs)
@@ -113,19 +114,21 @@ def finish_episode():
     rewards_dict = {num:[] for num in range(model.num_agents)}
     policy_losses = []
     value_losses = []
-
+    rewards = np.zeros(len(model.rewards_dict[0]))
     for agent_id in range(model.num_agents):
         R = 0
+        print(len(model.rewards_dict[agent_id]))
         for r in model.rewards_dict[agent_id][::-1]:
             R = r + args.gamma * R
             rewards_dict[agent_id].insert(0, R)
-        rewards_dict[agent_id] = torch.Tensor(rewards_dict[agent_id])
-        rewards_dict[agent_id] = (rewards_dict[agent_id] - rewards_dict[agent_id].mean()) / (rewards_dict[agent_id].std() + np.finfo(np.float32).eps)
-        # pdb.set_trace()
-        for (log_prob, value), r in zip(saved_actions_dict[agent_id], rewards_dict[agent_id]):
-            reward = r - value.data[0]
-            policy_losses.append(-log_prob * Variable(reward))
-            value_losses.append(F.smooth_l1_loss(value, Variable(torch.Tensor([r]))))
+        rewards += rewards_dict[agent_id]
+    rewards = torch.Tensor(rewards)
+    rewards = (rewards - rewards.mean()) / (rewards.std() + np.finfo(np.float32).eps)
+    # pdb.set_trace()
+    for (log_prob, value), r in zip(saved_actions_dict[agent_id], rewards):
+        reward = r - value.data[0]
+        policy_losses.append(-log_prob * Variable(reward))
+        value_losses.append(F.smooth_l1_loss(value, Variable(torch.Tensor([r]))))
     optimizer.zero_grad()
     # print(value_losses)
     # print(policy_losses)
@@ -136,13 +139,13 @@ def finish_episode():
     model.saved_actions_dict.clear()
     return loss
 
-def save_checkpoint(state, is_best, filename='model/multiple_recurrent/checkpoint.pth.tar'):
+def save_checkpoint(state, is_best, filename='model/multiple_recurrent_same_reward/checkpoint.pth.tar'):
     print("save checkpoint")
     torch.save(state, filename)
     if is_best:
-        shutil.copyfile(filename, 'model/multiple_recurrent/model_best.pth.tar')
+        shutil.copyfile(filename, 'model/multiple_recurrent_same_reward/model_best.pth.tar')
 
-def load_checkpoint(model, filename='model/multiple_recurrent/checkpoint.pth.tar'):
+def load_checkpoint(model, filename='model/multiple_recurrent_same_reward/checkpoint.pth.tar'):
     if os.path.isfile(filename):
             checkpoint = torch.load(filename)
             episode = checkpoint['episode']
@@ -159,12 +162,18 @@ def repackage_hidden(h):
     else:
         return tuple(repackage_hidden(v) for v in h)
 
+model = Policy(num_agents=4)
+print(model)
+optimizer = optim.Adam(model.parameters(), lr=0.0001)
+
+model = load_checkpoint(model)
+
 def main():
     queue = deque([], maxlen=10)
     log_path = 'log'
     from datetime import datetime
     now = datetime.now()
-    log_path = "log/multiple_recurrent"
+    log_path = "log/multiple_recurrent_same_reward"
     logger = Logger(log_path,  now.strftime("%Y%m%d-%H%M%S"))
     is_best = False
     running_reward = 0
@@ -188,13 +197,16 @@ def main():
                 actions[agent_id] = select_action(state, agent_id)
             states, rewards, done, info_dict = env.step(actions)
             done_list = info_dict["done"]
+            collision_list = info_dict["collision"]
+            collision = np.any(collision_list)
             if args.render:
                 env.render()
             for agent_id in model.live_agents:
-                if done_list[agent_id]:
-                    model.live_agents.remove(agent_id)
                 model.rewards_dict[agent_id].append(rewards[agent_id])
-            if done:
+            # for agent_id in model.live_agents:
+            #     if done_list[agent_id]:
+            #         model.live_agents.remove(agent_id)
+            if done or collision:
                 break
         total_reward = np.sum([np.sum(model.rewards_dict[idx]) for idx in range(model.num_agents)])
 

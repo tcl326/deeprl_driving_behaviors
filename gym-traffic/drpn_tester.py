@@ -15,7 +15,8 @@ from torch.autograd import Variable
 from torch.distributions import Categorical
 from logger import Logger
 import pdb
-# import cv2
+import os
+import cv2
 
 
 parser = argparse.ArgumentParser(description='PyTorch actor-critic example')
@@ -30,7 +31,7 @@ parser.add_argument('--log-interval', type=int, default=10, metavar='N',
 args = parser.parse_args()
 
 
-env = gym.make('Traffic-Multi-cli-v0')
+env = gym.make('Traffic-Multi-gui-v0')
 env.seed(args.seed)
 torch.manual_seed(args.seed)
 
@@ -91,15 +92,11 @@ class Policy(nn.Module):
         return F.softmax(action_scores, dim=-1), state_values
 
 
-model = Policy(num_agents=4)
-print(model)
-optimizer = optim.Adam(model.parameters(), lr=0.0001)
-
 def select_action(state, agent_id):
     # if agent_id == 0:
     #     # print(state.shape)
-    #     cv2.imshow('image',state[0,:,:] + state[1,:,:])
-    #     cv2.waitKey(1)
+    cv2.imshow('image' +str(agent_id),state[0,:,:] + state[1,:,:])
+    cv2.waitKey(1)
     state = torch.from_numpy(state).float()
     probs, state_value = model(Variable(state).unsqueeze(0), agent_id)
     m = Categorical(probs)
@@ -142,7 +139,7 @@ def save_checkpoint(state, is_best, filename='model/multiple_recurrent/checkpoin
     if is_best:
         shutil.copyfile(filename, 'model/multiple_recurrent/model_best.pth.tar')
 
-def load_checkpoint(model, filename='model/multiple_recurrent/checkpoint.pth.tar'):
+def load_checkpoint(model, filename='model/multiple_recurrent_same_reward/checkpoint.pth.tar'):
     if os.path.isfile(filename):
             checkpoint = torch.load(filename)
             episode = checkpoint['episode']
@@ -158,6 +155,12 @@ def repackage_hidden(h):
         return Variable(h.data)
     else:
         return tuple(repackage_hidden(v) for v in h)
+
+model = Policy(num_agents=4)
+print(model)
+optimizer = optim.Adam(model.parameters(), lr=0.0001)
+
+model = load_checkpoint(model)
 
 def main():
     queue = deque([], maxlen=10)
@@ -199,12 +202,12 @@ def main():
         total_reward = np.sum([np.sum(model.rewards_dict[idx]) for idx in range(model.num_agents)])
 
         running_reward = running_reward * 0.99 + total_reward * 0.01
-        loss = finish_episode()
+        # loss = finish_episode()
         queue.append(total_reward)
         print(total_reward, np.mean(queue))
 
-        logger.scalar_summary('loss', loss.data[0], i_episode)
-        logger.scalar_summary('reward', total_reward, i_episode)
+        # logger.scalar_summary('loss', loss.data[0], i_episode)
+        # logger.scalar_summary('reward', total_reward, i_episode)
 
         if total_reward > max_reward:
             max_reward = total_reward
