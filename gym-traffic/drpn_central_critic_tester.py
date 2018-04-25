@@ -45,16 +45,16 @@ class Policy(nn.Module):
         # self.affine1 = nn.Linear(4, 128)
         # self.action_head = nn.Linear(128, 2)
         self.conv1 = nn.Conv2d(2, 32, (8,8), (4,4))
-        self.conv2 = nn.Conv2d(32, 64, (4,4), (2,2))
-        self.conv3 = nn.Conv2d(64, 64, (3,3), (1,1))
+        self.conv2 = nn.Conv2d(32, 16, (4,4), (2,2))
+        self.conv3 = nn.Conv2d(16, 16, (3,3), (1,1))
         # self.conv4 = nn.Conv2d(64, 512, (7,7), (1,1))
-        self.rnn1 = nn.LSTM(input_size=3136, hidden_size=512, num_layers=2)
-        self.action1 = nn.Linear(512, 128)
+        self.rnn1 = nn.LSTM(input_size=784, hidden_size=256, num_layers=2)
+        self.action1 = nn.Linear(256, 128)
         self.action2 = nn.Linear(128, 64)
         self.action_head = nn.Linear(64, 3)
-        self.value1 = nn.Linear(512, 128)
-        self.value2 = nn.Linear(128, 64)
-        self.value_head = nn.Linear(64, 1)
+        # self.value1 = nn.Linear(512, 128)
+        # self.value2 = nn.Linear(128, 64)
+        # self.value_head = nn.Linear(64, 1)
         self.num_agents = num_agents
         self.agent_ids = [num for num in range(num_agents)]
         self.live_agents = list(self.agent_ids)
@@ -85,11 +85,11 @@ class Policy(nn.Module):
         action = F.relu(self.action2(action))
         action_scores = self.action_head(action)
         # print(action_scores)
-        value = F.relu(self.value1(flatten))
-        value = F.relu(self.value2(value))
-        state_values = self.value_head(value)
+        # value = F.relu(self.value1(flatten))
+        # value = F.relu(self.value2(value))
+        # state_values = self.value_head(value)
         # print(state_values)
-        return F.softmax(action_scores, dim=-1), state_values
+        return F.softmax(action_scores, dim=-1)
 
 
 def select_action(state, agent_id):
@@ -98,10 +98,10 @@ def select_action(state, agent_id):
     cv2.imshow('image' +str(agent_id),state[0,:,:] + state[1,:,:])
     cv2.waitKey(1)
     state = torch.from_numpy(state).float()
-    probs, state_value = model(Variable(state).unsqueeze(0), agent_id)
+    probs = model(Variable(state).unsqueeze(0), agent_id)
     m = Categorical(probs)
     action = m.sample()
-    model.saved_actions_dict[agent_id].append(SavedAction(m.log_prob(action), state_value))
+    # model.saved_actions_dict[agent_id].append(SavedAction(m.log_prob(action), state_value))
     return action.data[0]
 
 
@@ -144,7 +144,7 @@ def save_checkpoint(state, is_best, filename='model/multiple_recurrent/checkpoin
 #     torch.save(state, os.path.join(folder, filename))
 #     if is_best:
 #         shutil.copyfile(os.path.join(folder, filename), os.path.join(folder, 'model_best.pth.tar'))
-def load_checkpoint(model, folder='model/multiple_central_critic', filename='policy_850.pth.tar'):
+def load_checkpoint(model, folder='model/multiple_central_critic', filename='policy_4300.pth.tar'):
     if os.path.isfile(os.path.join(folder, filename)):
             checkpoint = torch.load(os.path.join(folder, filename))
             episode = checkpoint['episode']
@@ -219,13 +219,13 @@ def main():
             is_best = True
         else:
             is_best = False
-        if i_episode % args.log_interval == 0:
-            save_checkpoint({
-                        'episode': i_episode,
-                        'state_dict': model.state_dict(),
-                        'best_reward': max_reward,
-                        'optimizer': optimizer.state_dict(),
-                    }, is_best)
+        # if i_episode % args.log_interval == 0:
+        #     save_checkpoint({
+        #                 'episode': i_episode,
+        #                 'state_dict': model.state_dict(),
+        #                 'best_reward': max_reward,
+        #                 'optimizer': optimizer.state_dict(),
+        #             }, is_best)
 
         if i_episode % args.log_interval == 0:
             print('Episode {}\tLast Reward: {:5f}\tBest Reward: {:.2f}'.format(

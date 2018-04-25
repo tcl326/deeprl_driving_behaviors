@@ -44,11 +44,11 @@ class ActorNetwork(nn.Module):
         # self.affine1 = nn.Linear(4, 128)
         # self.action_head = nn.Linear(128, 2)
         self.conv1 = nn.Conv2d(2, 32, (8,8), (4,4))
-        self.conv2 = nn.Conv2d(32, 64, (4,4), (2,2))
-        self.conv3 = nn.Conv2d(64, 64, (3,3), (1,1))
+        self.conv2 = nn.Conv2d(32, 16, (4,4), (2,2))
+        self.conv3 = nn.Conv2d(16, 16, (3,3), (1,1))
         # self.conv4 = nn.Conv2d(64, 512, (7,7), (1,1))
-        self.rnn1 = nn.LSTM(input_size=3136, hidden_size=512, num_layers=2)
-        self.action1 = nn.Linear(512, 128)
+        self.rnn1 = nn.LSTM(input_size=784, hidden_size=256, num_layers=2)
+        self.action1 = nn.Linear(256, 128)
         self.action2 = nn.Linear(128, 64)
         self.action_head = nn.Linear(64, 3)
         self.num_agents = num_agents
@@ -94,16 +94,20 @@ class CriticNetwork(nn.Module):
         # self.affine1 = nn.Linear(4, 128)
         # self.action_head = nn.Linear(128, 2)
         self.conv1 = nn.Conv2d(2*num_agents, 32, (8,8), (4,4))
-        self.conv2 = nn.Conv2d(32, 64, (4,4), (2,2))
-        self.conv3 = nn.Conv2d(64, 64, (3,3), (1,1))
+        self.conv2 = nn.Conv2d(32, 16, (4,4), (2,2))
+        self.conv3 = nn.Conv2d(16, 16, (3,3), (1,1))
         # self.conv4 = nn.Conv2d(64, 512, (7,7), (1,1))
-        self.rnn1 = nn.LSTM(input_size=3136, hidden_size=512, num_layers=2)
+        self.rnn1 = nn.LSTM(input_size=784+num_agents, hidden_size=256, num_layers=2)
         # self.action1 = nn.Linear(512, 128)
         # self.action2 = nn.Linear(128, 64)
         # self.action_head = nn.Linear(64, 3)
-        self.value1 = nn.Linear(512, 128)
-        self.value2 = nn.Linear(128, 64)
-        self.value_head = nn.Linear(64, 1)
+        self.value1 = []
+        self.value2 = []
+        self.value_head = []
+        for n in range(num_agents):
+            self.value1.append(nn.Linear(256, 128))
+            self.value2.append(nn.Linear(128, 64))
+            self.value_head.append(nn.Linear(64, 1))
         # self.num_agents = num_agents
         # self.agent_ids = [num for num in range(num_agents)]
         # self.live_agents = list(self.agent_ids)
@@ -118,7 +122,7 @@ class CriticNetwork(nn.Module):
         self.reset = False
         self.time_steps = 1
 
-    def forward(self, x):
+    def forward(self, x, actions):
         conv1 = F.relu(self.conv1(x))
         conv2 = F.relu(self.conv2(conv1))
         conv3 = F.relu(self.conv3(conv2))
@@ -126,10 +130,12 @@ class CriticNetwork(nn.Module):
         # print(conv3.size())
         # print(conv4.size())
         flatten = conv3.view(self.time_steps,1,-1)
+        # print(flatten, actions.view(self.time_steps, 1, -1))
+        concat = torch.cat((flatten, actions.view(self.time_steps, 1, -1)), 2)
         if self.reset or not self.h_n or not self.c_n:
-            lstm1, (self.h_n, self.c_n) = self.rnn1(flatten)
+            lstm1, (self.h_n, self.c_n) = self.rnn1(concat)
         else:
-            lstm1, (self.h_n, self.c_n) = self.rnn1(flatten, (self.h_n, self.c_n))
+            lstm1, (self.h_n, self.c_n) = self.rnn1(concat, (self.h_n, self.c_n))
             self.reset = False
         # print(flatten.size())
         flatten = lstm1.view(1, -1)
@@ -137,9 +143,17 @@ class CriticNetwork(nn.Module):
         # action = F.relu(self.action2(action))
         # action_scores = self.action_head(action)
         # print(action_scores)
-        value = F.relu(self.value1(flatten))
-        value = F.relu(self.value2(value))
-        state_values = self.value_head(value)
+        value = []
+        state_values = []
+        for i in range(len(self.value1)):
+            value.append(F.relu(self.value1[i](flatten)))
+        for i in range(len(self.value2)):
+            value[i] = F.relu(self.value2[i](value[i]))
+        for i in range(len(self.value_head)):
+            state_values.append(self.value_head[i](value[i]))
+        # value = F.relu(self.value1(flatten))
+        # value = F.relu(self.value2(value))
+        # state_values = self.value_head(value)
         # print(state_values)
         return state_values
 
@@ -151,17 +165,16 @@ critic_model = CriticNetwork(num_agents=4)
 print(critic_model)
 critic_optimizer = optim.Adam(critic_model.parameters(), lr=0.0001)
 
-def select_action(state, agent_id, state_value):
+def get_prob(state, agent_id):
     # if agent_id == 0:
     #     # print(state.shape)
     #     cv2.imshow('image',state[0,:,:] + state[1,:,:])
     #     cv2.waitKey(1)
     state = torch.from_numpy(state).float()
     probs = actor_model(Variable(state).unsqueeze(0), agent_id)
-    m = Categorical(probs)
-    action = m.sample()
-    actor_model.saved_actions_dict[agent_id].append(SavedAction(m.log_prob(action), state_value))
-    return action.data[0]
+
+    return probs
+    # return action.data[0]
 
 
 def finish_episode():
@@ -198,14 +211,14 @@ def finish_episode():
 
     actor_model.rewards_dict.clear()
     actor_model.saved_actions_dict.clear()
-    return loss
+    return actor_loss, critic_loss
 
 def save_checkpoint(state, is_best, folder='model/multiple_central_critic', filename='checkpoint.pth.tar'):
     print("save checkpoint")
 
     torch.save(state, os.path.join(folder, filename))
     if is_best:
-        shutil.copyfile(filename, os.path.join(folder, 'model_best.pth.tar'))
+        shutil.copyfile(os.path.join(folder, filename), os.path.join(folder, 'model_best.pth.tar'))
 
 def load_checkpoint(model, filename='model/multiple_recurrent/checkpoint.pth.tar'):
     if os.path.isfile(filename):
@@ -229,7 +242,7 @@ def main():
     log_path = 'log'
     from datetime import datetime
     now = datetime.now()
-    log_path = "log/multiple_recurrent"
+    log_path = "log/multiple_central_critic"
     logger = Logger(log_path,  now.strftime("%Y%m%d-%H%M%S"))
     is_best = False
     running_reward = 0
@@ -247,6 +260,8 @@ def main():
                 for agent_id in actor_model.live_agents:
                     (actor_model.h_n_dict[agent_id], actor_model.c_n_dict[agent_id]) = repackage_hidden((actor_model.h_n_dict[agent_id], actor_model.c_n_dict[agent_id]))
             actions = np.zeros(actor_model.num_agents)
+            probs = []
+            actions_replay = [Variable(torch.from_numpy(np.array([0])).long()) for agent in range(actor_model.num_agents)]
             states_variable = np.zeros((8, 84, 84))
             states = [resize(state,(84, 84)) for state in states]
             for i, s in enumerate(states):
@@ -254,11 +269,24 @@ def main():
 
             # print(states_variable.shape)
             states_variable = torch.from_numpy(states_variable).float()
-            state_value = critic_model(Variable(states_variable).unsqueeze(0))
+
             for agent_id in actor_model.live_agents:
                 state = states[agent_id]
                 state = state.T
-                actions[agent_id] = select_action(state, agent_id, state_value)
+                probs.append(get_prob(state, agent_id))
+
+            for i, agent_id in enumerate(actor_model.live_agents):
+                m = Categorical(probs[i])
+                action = m.sample()
+                # print(action)
+                actions_replay[agent_id] = action
+                actions[agent_id] = action.data[0]
+            # state = torch.from_numpy(state).float()
+            state_values = critic_model(Variable(states_variable).unsqueeze(0), Variable(torch.from_numpy(actions).float()).unsqueeze(0))
+
+            for agent_id in range(actor_model.num_agents):
+                actor_model.saved_actions_dict[agent_id].append(SavedAction(m.log_prob(actions_replay[agent_id]), state_values[agent_id]))
+
             states, rewards, done, info_dict = env.step(actions)
             done_list = info_dict["done"]
             if args.render:
@@ -272,11 +300,12 @@ def main():
         total_reward = np.sum([np.sum(actor_model.rewards_dict[idx]) for idx in range(actor_model.num_agents)])
 
         running_reward = running_reward * 0.99 + total_reward * 0.01
-        loss = finish_episode()
+        actor_loss, critic_loss = finish_episode()
         queue.append(total_reward)
         print(total_reward, np.mean(queue))
 
-        logger.scalar_summary('loss', loss.data[0], i_episode)
+        logger.scalar_summary('actor_loss', actor_loss.data[0], i_episode)
+        logger.scalar_summary('critic_loss', critic_loss.data[0], i_episode)
         logger.scalar_summary('reward', total_reward, i_episode)
 
         if total_reward > max_reward:
