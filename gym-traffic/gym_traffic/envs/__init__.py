@@ -11,3 +11,4 @@ from gym_traffic.envs.traffic_env_cross2 import TrafficEnvCross2
 
 from gym_traffic.envs.traffic_env_multi_agents import TrafficEnvMultiAgents
 from gym_traffic.envs.traffic_env_multi_agents_simple import TrafficEnvMultiAgentsSimple
+from gym_traffic.envs.traffic_env_multi_agents_simple_preset import TrafficEnvMultiAgentsSimplePreset

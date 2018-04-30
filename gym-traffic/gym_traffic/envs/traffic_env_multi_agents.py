@@ -80,6 +80,7 @@ class TrafficEnvMultiAgents(Env):
     def random_vehicle(self, ego_vehicles_list):
         # print(ego_vehicles_list)
         ego_vehicle = ego_vehicles_list[np.random.choice(len(ego_vehicles_list))]
+        # ego_vehicle = ego_vehicles_list[0]
         return ego_vehicle
 
     def relative_path(self, *paths):
@@ -165,7 +166,7 @@ class TrafficEnvMultiAgents(Env):
             reward = -5000
         elif ego_vehicle.reached_goal(traci.vehicle.getPosition(ego_vehicle.vehID)):
             reward = 1000
-        elif min_dist < 2.5:
+        elif min_dist < 1.5:
             reward = -100
         else:
             reward = -1

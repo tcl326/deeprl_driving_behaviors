@@ -37,7 +37,7 @@ parser.add_argument('--log-interval', type=int, default=10, metavar='N',
 args = parser.parse_args()
 
 
-env = gym.make('Traffic-Multi-gui-v0')
+env = gym.make('Traffic-Multi-preset-cli-v0')
 env.seed(args.seed)
 torch.manual_seed(args.seed)
 
@@ -251,7 +251,7 @@ def replay_memory(batch_size):
     actor_model.saved_actions_dict.clear()
     return actor_loss, critic_loss
 
-def save_checkpoint(state, is_best, folder='model/multiple_central_critic_buffer', filename='checkpoint.pth.tar'):
+def save_checkpoint(state, is_best, folder='model/multiple_central_critic_buffer_no_random', filename='checkpoint.pth.tar'):
     print("save checkpoint")
 
     torch.save(state, os.path.join(folder, filename))
@@ -276,8 +276,8 @@ def repackage_hidden(h):
     else:
         return tuple(repackage_hidden(v) for v in h)
 
-actor_model = load_checkpoint(actor_model, filename='policy_140.pth.tar')
-critic_model = load_checkpoint(critic_model, filename='critic_140.pth.tar')
+actor_model = load_checkpoint(actor_model, filename='policy_170.pth.tar')
+critic_model = load_checkpoint(critic_model, filename='critic_170.pth.tar')
 
 def main():
     queue = deque([], maxlen=10)

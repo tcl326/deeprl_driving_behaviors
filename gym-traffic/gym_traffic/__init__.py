@@ -47,3 +47,20 @@ register(
     kwargs={"mode": "gui"},
     nondeterministic=True
 )
+
+
+register(
+    id='Traffic-Multi-preset-gui-v0',
+    entry_point='gym_traffic.envs:TrafficEnvMultiAgentsSimplePreset',
+    tags={'wrapper_config.TimeLimit.max_episode_steps': 1000},
+    kwargs={"mode": "gui"},
+    nondeterministic=True
+)
+
+register(
+    id='Traffic-Multi-preset-cli-v0',
+    entry_point='gym_traffic.envs:TrafficEnvMultiAgentsSimplePreset',
+    tags={'wrapper_config.TimeLimit.max_episode_steps': 1000},
+    kwargs={"mode": "cli"},
+    nondeterministic=True
+)
